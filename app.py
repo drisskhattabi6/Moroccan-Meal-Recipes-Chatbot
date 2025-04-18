@@ -1,7 +1,6 @@
-import time, re, io, os
+import re, io, os
 import subprocess
 import streamlit as st
-from langchain_ollama import OllamaLLM
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import simpleSplit
@@ -110,7 +109,6 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -122,10 +120,10 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("Ask Me!"):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+if query := st.chat_input("Ask Me..."):
+    st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(query)
 
     with st.chat_message("assistant"):
         try:
@@ -134,7 +132,7 @@ if prompt := st.chat_input("Ask Me!"):
                     response_placeholder = st.empty()
                     streamed_response = ""
 
-                    for chunk in rag_system.generate_response(prompt, selected_model):  # Stream response
+                    for chunk in rag_system.generate_response(query, selected_model):  # Stream response
                         if isinstance(chunk, dict):
                             metadata = chunk
                         else:
@@ -150,7 +148,7 @@ if prompt := st.chat_input("Ask Me!"):
                     LLM Name : {selected_model} | Total Tokens: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}
                     """
                 else :
-                    llm_response, total_tokens = rag_system.generate_response2(query=prompt, llm_name=llm_name, openrouter_api_key=openrouter_api_key)
+                    llm_response, total_tokens = rag_system.generate_response2(query=query, llm_name=llm_name, openrouter_api_key=openrouter_api_key)
                     response = f"""
                     {llm_response}
                     \n----

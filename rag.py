@@ -28,9 +28,6 @@ try:
 except LookupError:
     download('punkt_tab')
 
-# nltk.download('punkt')
-# nltk.download('punkt_tab')
-
 # Load SentenceTransformer model for semantic similarity (Contriever-style)
 embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 

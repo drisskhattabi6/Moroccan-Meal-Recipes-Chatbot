@@ -1,2 +1,5 @@
 Data Preparation/
 Fine-tuning/
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
