@@ -48,7 +48,7 @@ class RAGSystem :
         self.logger = self._setup_logging()
         self.embedding_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
         self.client = chromadb.PersistentClient(path=self.db_path)
-        self.collection = self.client.get_or_create_collection(name=self.collection_name)
+        self.collection = self.client.get_collection(name=self.collection_name)
         # self.logger.info("*** RAGSystem initialized ***")
     
     def _setup_logging(self) -> logging.Logger:
