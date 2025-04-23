@@ -113,7 +113,7 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Initialize the RAG system
-rag_system = RAGSystem(collection_name="recipes", db_path="Moroccan_Recipes_ChromaDB", n_results=n_results)
+rag_system = RAGSystem(collection_name="moroccan_recipes", db_path="Moroccan_Recipes_FaissDB", n_results=n_results)
 
 # Display chat history
 for message in st.session_state.messages:

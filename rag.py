@@ -1,5 +1,5 @@
 import logging
-import chromadb
+import chromadb, faiss
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
 import time, os
 import requests
@@ -13,6 +13,8 @@ import numpy as np
 from nltk.data import find
 from nltk import download
 from nltk.tokenize import word_tokenize
+import pickle
+
 
 load_dotenv()
 
@@ -34,7 +36,7 @@ embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 class RAGSystem :
     def __init__(
             self, collection_name: str, 
-            db_path: str ="Moroccan_Recipes_ChromaDB",
+            db_path: str ="Moroccan_Recipes_DB",
             n_results: int =5
         ) :
 
@@ -47,8 +49,30 @@ class RAGSystem :
 
         self.logger = self._setup_logging()
         self.embedding_model = OllamaEmbeddings(model="mxbai-embed-large:latest")
-        self.client = chromadb.PersistentClient(path=self.db_path)
-        self.collection = self.client.get_collection(name=self.collection_name)
+
+        self.index_path = os.path.join(db_path, f"{collection_name}.index")
+        self.meta_path = os.path.join(db_path, f"{collection_name}.pkl")
+        os.makedirs(db_path, exist_ok=True)
+        print('self.index_path :', self.index_path)
+        print('self.meta_path :', self.meta_path)
+
+        if os.path.exists(self.index_path):
+            
+            print("🔄 Loading FAISS index...")
+            self.index = faiss.read_index(self.index_path)
+        else:
+            print("⚙️ No FAISS index Found -> Creating new FAISS index...")
+            self.index = faiss.IndexFlatL2(1024)
+
+        if os.path.exists(self.meta_path):
+            print("📦 Loading metadata...")
+            with open(self.meta_path, 'rb') as f:
+                self.collection = pickle.load(f)
+        else:
+            self.collection = []
+
+        # self.client = chromadb.PersistentClient(path=self.db_path)
+        # self.collection = self.client.get_collection(name=self.collection_name)
         # self.logger.info("*** RAGSystem initialized ***")
     
     def _setup_logging(self) -> logging.Logger:
@@ -76,12 +100,16 @@ class RAGSystem :
     def _retrieve(self, user_text: str, n_results:int=10):
         """Retrieves relevant documents based on user input."""
         embedding = self._generate_embeddings(user_text)
-        results = self.collection.query(query_embeddings=[embedding], n_results=n_results)
+        # results = self.collection.query(query_embeddings=[embedding], n_results=n_results)
         
-        if not results['documents']:
-            return []
+        # if not results['documents']:
+        #     return []
         
-        return results['documents'][0]
+        # return results['documents'][0]
+    
+        index = self.index
+        _, I = index.search(np.array([embedding]), n_results)
+        return [self.collection[i] for i in I[0]] if I.any() else []
     
     def _rerank_docs(self, chunks: list, query: str, top_k: int = 5):
         """
@@ -243,5 +271,5 @@ class RAGSystem :
         
         return response_data["choices"][0]["message"]["content"], response_data["usage"]["total_tokens"]
 
-    def delete_collection(self):
-        self.client.delete_collection(self.collection_name)
+    # def delete_collection(self):
+    #     self.client.delete_collection(self.collection_name)
