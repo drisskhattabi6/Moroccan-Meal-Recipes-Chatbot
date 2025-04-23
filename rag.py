@@ -1,21 +1,20 @@
+import json, re
+import faiss
+import pickle
+import socket
 import logging
-import chromadb, faiss
-from langchain_ollama import OllamaEmbeddings, OllamaLLM
 import time, os
 import requests
-import json
+import numpy as np
+from nltk import download
+from nltk.data import find
 from dotenv import load_dotenv
 from rank_bm25 import BM25Okapi
+from nltk.tokenize import word_tokenize
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-# import nltk
-from nltk.data import find
-from nltk import download
-from nltk.tokenize import word_tokenize
-import pickle
-
-
+from langchain_ollama import OllamaEmbeddings, OllamaLLM
+from duckduckgo_search import DDGS
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
@@ -29,6 +28,21 @@ try:
     find('tokenizers/punkt_tab')
 except LookupError:
     download('punkt_tab')
+
+def get_recipe_images(query, max_results=3):
+    with DDGS() as ddgs:
+        results = ddgs.images(keywords=query, max_results=max_results)
+        return [result['image'] for result in results]
+
+
+def is_connected():
+    try:
+        # Connect to the host -- tells us if the host is actually reachable
+        socket.create_connection(("www.google.com", 80))
+        return True
+    except OSError:
+        pass
+    return False
 
 # Load SentenceTransformer model for semantic similarity (Contriever-style)
 embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
@@ -52,28 +66,22 @@ class RAGSystem :
 
         self.index_path = os.path.join(db_path, f"{collection_name}.index")
         self.meta_path = os.path.join(db_path, f"{collection_name}.pkl")
-        os.makedirs(db_path, exist_ok=True)
-        print('self.index_path :', self.index_path)
-        print('self.meta_path :', self.meta_path)
+        # os.makedirs(db_path, exist_ok=True)
 
         if os.path.exists(self.index_path):
-            
-            print("🔄 Loading FAISS index...")
+            # print("🔄 Loading FAISS index...")
             self.index = faiss.read_index(self.index_path)
         else:
-            print("⚙️ No FAISS index Found -> Creating new FAISS index...")
-            self.index = faiss.IndexFlatL2(1024)
+            return "⚙️ No FAISS DB Found"
+            # print("⚙️ No FAISS index Found -> Creating new FAISS index...")
+            # self.index = faiss.IndexFlatL2(1024)
 
         if os.path.exists(self.meta_path):
-            print("📦 Loading metadata...")
+            # print("📦 Loading metadata...")
             with open(self.meta_path, 'rb') as f:
                 self.collection = pickle.load(f)
         else:
             self.collection = []
-
-        # self.client = chromadb.PersistentClient(path=self.db_path)
-        # self.collection = self.client.get_collection(name=self.collection_name)
-        # self.logger.info("*** RAGSystem initialized ***")
     
     def _setup_logging(self) -> logging.Logger:
         logger = logging.getLogger(__name__)
@@ -100,13 +108,7 @@ class RAGSystem :
     def _retrieve(self, user_text: str, n_results:int=10):
         """Retrieves relevant documents based on user input."""
         embedding = self._generate_embeddings(user_text)
-        # results = self.collection.query(query_embeddings=[embedding], n_results=n_results)
-        
-        # if not results['documents']:
-        #     return []
-        
-        # return results['documents'][0]
-    
+
         index = self.index
         _, I = index.search(np.array([embedding]), n_results)
         return [self.collection[i] for i in I[0]] if I.any() else []
@@ -177,6 +179,10 @@ class RAGSystem :
         - Answer concisely and accurately using only the given context.  
         - Put what you find from the context **without summarizing**.
         - Answer directly and concisely.
+        - if there are multiple answers, provide the most relevant one.
+        - If there is a list of ingredients, provide it as a structured list.
+        - If there is a list of make steps, provide it as a structured list.
+        - always provide the recipe name, description, ingredients, and make steps if available.
 
     ### **Answer:**
 
@@ -197,6 +203,16 @@ class RAGSystem :
             return "No relevant information found."
         
         reranked_retrieved_docs = self._rerank_docs(chunks=retrieved_docs, query=query, top_k=self.n_results)
+
+        images = []
+        if is_connected():
+            text = reranked_retrieved_docs[0]
+            match = re.search(r'Recipe Name\s*:\s*(.*)', text)
+            if match:
+                recipe_name = match.group(1)
+                images = get_recipe_images(recipe_name)
+            else:
+                images = get_recipe_images(query)
 
         context = "\n########\n".join(reranked_retrieved_docs)
         
@@ -220,7 +236,8 @@ class RAGSystem :
         self.logger.info(f"-> input token count : {token_count}  |  response time : {self._format_time(response_time)}")
         metadata = {
             'token_count': token_count,
-            'response_time': self._format_time(response_time)
+            'response_time': self._format_time(response_time),
+            'images': images,
         }
         yield metadata
 
@@ -239,6 +256,16 @@ class RAGSystem :
             return "No relevant information found."
         
         reranked_retrieved_docs = self._rerank_docs(chunks=retrieved_docs, query=query, top_k=self.n_results)
+
+        images = []
+        if is_connected():
+            text = reranked_retrieved_docs[0]
+            match = re.search(r'Recipe Name\s*:\s*(.*)', text)
+            if match:
+                recipe_name = match.group(1)
+                images = get_recipe_images(recipe_name)
+            else:
+                images = get_recipe_images(query)
 
         context = "\n-----\n".join(reranked_retrieved_docs)
 
@@ -269,7 +296,9 @@ class RAGSystem :
             error_message = response_data["error"].get("message", "Unknown error")
             raise Exception(f"API Error: {error_message}")
         
-        return response_data["choices"][0]["message"]["content"], response_data["usage"]["total_tokens"]
+        return response_data["choices"][0]["message"]["content"], response_data["usage"]["total_tokens"], images
 
-    # def delete_collection(self):
-    #     self.client.delete_collection(self.collection_name)
+
+if __name__ == "__main__":
+    images = get_recipe_images("Rfissa Moroccan recipe")
+    print(images)

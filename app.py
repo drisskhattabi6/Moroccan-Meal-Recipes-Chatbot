@@ -118,16 +118,27 @@ rag_system = RAGSystem(collection_name="moroccan_recipes", db_path="Moroccan_Rec
 # Display chat history
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
+        if "images" in message:
+            cols = st.columns(3)  # Create 3 equal columns
+            for col, img_url in zip(cols, message["images"]):
+                with col:
+                    st.image(img_url, use_container_width=True)
         st.markdown(message["content"])
 
-if query := st.chat_input("Ask Me..."):
+
+if query := st.chat_input("Ask about a Moroccan meal or recipe"):
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.markdown(query)
 
     with st.chat_message("assistant"):
         try:
-            with st.spinner("Thinking..."):
+            with st.spinner("Searching and Generating..."):
+
+                llm_response = ""
+                images = []
+                response = ""
+
                 if llm_provider == 'Ollama' :
                     response_placeholder = st.empty()
                     streamed_response = ""
@@ -137,7 +148,10 @@ if query := st.chat_input("Ask Me..."):
                             metadata = chunk
                         else:
                             streamed_response = chunk 
-                            response_placeholder.markdown(streamed_response)
+                            # response_placeholder.markdown(streamed_response)
+
+                    llm_response = streamed_response
+                    images = metadata.get("images", [])
 
                     st.write(f"""\n\n----
                     LLM Name : {selected_model} | Token Count: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}""")
@@ -147,17 +161,28 @@ if query := st.chat_input("Ask Me..."):
                     \n\n----
                     LLM Name : {selected_model} | Total Tokens: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}
                     """
+
                 else :
-                    llm_response, total_tokens = rag_system.generate_response2(query=query, llm_name=llm_name, openrouter_api_key=openrouter_api_key)
+                    llm_response, total_tokens, images = rag_system.generate_response2(query=query, llm_name=llm_name, openrouter_api_key=openrouter_api_key)
                     response = f"""
                     {llm_response}
                     \n----
                     LLM Name : {llm_name} | Total Tokens : {total_tokens} | n_results of context: {n_results}
                     """
+                
+                if images:
+                    cols = st.columns(3)  # Create 3 equal columns
+                    for col, img_url in zip(cols, images):
+                        with col:
+                            st.image(img_url, use_container_width=True)
+
                     st.write(response)
 
-            # Display and store assistant response
-            st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.session_state.messages.append({"role": "assistant", "content": response, "images": images})
+
+                else : 
+                    st.write(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
 
         except Exception as e:
             st.session_state.messages.append({"role": "assistant", "content": f"Error: {e}"})
