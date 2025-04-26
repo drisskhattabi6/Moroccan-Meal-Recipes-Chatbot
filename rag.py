@@ -14,10 +14,15 @@ from nltk.tokenize import word_tokenize
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
+from langchain_community.cache import BaseCache
+from langchain_core.callbacks import Callbacks
 from duckduckgo_search import DDGS
+
 load_dotenv()
 
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+
+OllamaLLM.model_rebuild()
 
 try:
     find('tokenizers/punkt')
@@ -214,7 +219,7 @@ class RAGSystem :
             else:
                 images = get_recipe_images(query)
 
-        context = "\n########\n".join(reranked_retrieved_docs)
+        context = "\n\n########\n\n".join(reranked_retrieved_docs)
         
         prompt = self._get_prompt(query, context)
 
@@ -267,7 +272,7 @@ class RAGSystem :
             else:
                 images = get_recipe_images(query)
 
-        context = "\n-----\n".join(reranked_retrieved_docs)
+        context = "\n\n########\n\n".join(reranked_retrieved_docs)
 
         prompt = self._get_prompt(query, context)
 
@@ -279,12 +284,10 @@ class RAGSystem :
             },
             data=json.dumps({
                 "model": llm_name,
-                "messages": [
-                {
+                "messages": [{
                     "role": "user",
                     "content": prompt
-                }
-                ],
+                }],
             })
         )
 
