@@ -78,13 +78,13 @@ if not available_models:
 
 # Streamlit page configuration
 st.set_page_config(page_title="Moroccan Meals & Recipes Chatbot", page_icon="🤖")
-st.markdown("#### 🗨️ Moroccan Meals & Recipes Chatbot")
+st.markdown("#### 🗨️ Moroccan Meals Recipes Chatbot")
 
 with st.sidebar:
     st.title("Settings :")
 
     # User selects the model Provider
-    llm_provider = st.selectbox("Select LLM Provider:", ['Ollama', 'Openrouter'], index=0)
+    llm_provider = st.selectbox("Select LLM Provider:", ['Openrouter', 'Ollama'], index=0)
 
     if llm_provider == 'Ollama' :
         selected_model = st.selectbox("Select an Ollama model:", available_models, index=0)
@@ -94,6 +94,8 @@ with st.sidebar:
 
     # Slider to choose the number of retrieved results
     n_results = st.slider("Number of retrieved documents", min_value=1, max_value=15, value=5)
+
+    task = st.selectbox("Select the Task:", ['Search for Meal Recipe', 'Recommend Meal Recipe'], index=0)
 
     # Button to download PDF
     if st.button("Download Chat as PDF"):
@@ -109,11 +111,21 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
+    st.info("""#### Chatbot Tasks : 
+            
+    - Search for Meal Recipe based on the Meal Name
+    - Recommend a Meal Recipe based on your Ingredients""")
+
+if task == 'Search for Meal Recipe' :
+    task_code = 1
+else : 
+    task_code = 2
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # Initialize the RAG system
-rag_system = RAGSystem(collection_name="moroccan_recipes", db_path="Moroccan_Recipes_FaissDB", n_results=n_results)
+rag_system = RAGSystem(collection_name="moroccan_recipes", db_path="Moroccan_Recipes_FaissDB", n_results=n_results, task_code=task_code)
 
 # Display chat history
 for message in st.session_state.messages:
@@ -153,8 +165,8 @@ if query := st.chat_input("Ask about a Moroccan meal or recipe"):
                     llm_response = streamed_response
                     images = metadata.get("images", [])
 
-                    st.write(f"""\n\n----
-                    LLM Name : {selected_model} | Token Count: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}""")
+                    # st.write(f"""\n\n----
+                    # LLM Name : {selected_model} | Token Count: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}""")
 
                     response = f"""
                     {remove_tags(streamed_response)}

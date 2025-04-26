@@ -56,12 +56,14 @@ class RAGSystem :
     def __init__(
             self, collection_name: str, 
             db_path: str ="Moroccan_Recipes_DB",
-            n_results: int =5
+            n_results: int =5,
+            task_code : int =1
         ) :
 
         self.collection_name = collection_name
         self.db_path = db_path
         self.n_results = n_results
+        self.task_code = task_code
 
         if not self.collection_name:
             raise ValueError("'collection_name' parameter is required.")
@@ -166,7 +168,7 @@ class RAGSystem :
 
         return final_chunks
     
-    def _get_prompt(self, query, context) :
+    def _get_prompt1(self, query, context) :
         prompt = f"""
     You are an AI assistant specialized in answering questions based **only** on the provided context. 
     The context is about Moroccan Recipes and Meals.
@@ -186,8 +188,34 @@ class RAGSystem :
         - Answer directly and concisely.
         - if there are multiple answers, provide the most relevant one.
         - If there is a list of ingredients, provide it as a structured list.
-        - If there is a list of make steps, provide it as a structured list.
-        - always provide the recipe name, description, ingredients, and make steps if available.
+        - If there is a list of preparation steps, provide it as a structured list.
+        - always provide the recipe name, description, ingredients, and preparation steps if available.
+
+    ### **Answer:**
+
+    """
+        return prompt
+    
+    def _get_prompt2(self, query, context) :
+        prompt = f"""
+    You are an AI assistant specialized for Recommend Meal depends on User Ingredients or Description based **only** on the provided context. 
+    The context is about Moroccan Recipes and Meals.
+    The context contains many recipes and meals related to the user question, and it's structured with sections separated by `########`. 
+
+    ### **Context:**  
+        '''  
+        {context}  
+        '''  
+
+    ### **User Ingredients or Description:**  
+        "{query}"  
+
+    ### **Instructions:**  
+        - Answer concisely and accurately using only the given context.  
+        - Put what you find from the context **without summarizing**.
+        - Answer directly and concisely.
+        - Recommend 3 Meal(s) depends on User Ingredients or Description.
+        - always provide the recipe name, description, ingredients, and preparation steps (if available) in structured list.
 
     ### **Answer:**
 
@@ -221,7 +249,10 @@ class RAGSystem :
 
         context = "\n\n########\n\n".join(reranked_retrieved_docs)
         
-        prompt = self._get_prompt(query, context)
+        if self.task_code == 1 :
+            prompt = self._get_prompt1(query, context)
+        else : 
+            prompt = self._get_prompt2(query, context)
 
         self.logger.info(f"-> User Query : {query}")
         self.logger.info(f"-> Context : {prompt}")
@@ -274,7 +305,10 @@ class RAGSystem :
 
         context = "\n\n########\n\n".join(reranked_retrieved_docs)
 
-        prompt = self._get_prompt(query, context)
+        if self.task_code == 1 :
+            prompt = self._get_prompt1(query, context)
+        else : 
+            prompt = self._get_prompt2(query, context)
 
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
