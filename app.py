@@ -6,6 +6,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.utils import simpleSplit
 from rag import RAGSystem
 
+
 def generate_pdf():
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=letter)
@@ -33,18 +34,28 @@ def generate_pdf():
             c.line(40, y, width - 40, y)
             y -= 20  
 
-        # Wrap text within max_width
+        # Wrap main text
         wrapped_lines = simpleSplit(text, c._fontname, c._fontsize, max_width)
-
         for line in wrapped_lines:
             c.drawString(40, y, line)
             y -= 20
-            
-            # Handle page breaks
             if y < 40:
                 c.showPage()
                 c.setFont("Helvetica", 12)
-                y = height - 40  # Reset position after new page
+                y = height - 40
+
+        # Add images if they exist
+        if msg["role"] == "assistant" and "images" in msg and msg["images"]:
+            for img_link in msg["images"]:
+                img_text = f"Image: {img_link}"
+                wrapped_img_lines = simpleSplit(img_text, c._fontname, c._fontsize, max_width)
+                for line in wrapped_img_lines:
+                    c.drawString(60, y, line)  # Slight indent for images
+                    y -= 20
+                    if y < 40:
+                        c.showPage()
+                        c.setFont("Helvetica", 12)
+                        y = height - 40
 
     c.save()
     buffer.seek(0)
@@ -93,9 +104,9 @@ with st.sidebar:
         openrouter_api_key = st.text_input("Enter Openrouter API Key", type="password", value=os.getenv("OPENROUTER_API_KEY"))
 
     # Slider to choose the number of retrieved results
-    n_results = st.slider("Number of retrieved documents", min_value=1, max_value=15, value=5)
+    n_results = st.slider("Number of retrieved documents", min_value=3, max_value=10, value=5)
 
-    task = st.selectbox("Select the Task:", ['Search for Meal Recipe', 'Recommend Meal Recipe'], index=0)
+    task = st.selectbox("Select the Task:", ['Ask', 'Recommend'], index=0)
 
     # Button to download PDF
     if st.button("Download Chat as PDF"):
@@ -116,7 +127,7 @@ with st.sidebar:
     - Search for Meal Recipe based on the Meal Name
     - Recommend a Meal Recipe based on your Ingredients""")
 
-if task == 'Search for Meal Recipe' :
+if task == 'Ask' :
     task_code = 1
 else : 
     task_code = 2
@@ -138,7 +149,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 
-if query := st.chat_input("Ask about a Moroccan meal or recipe"):
+if query := st.chat_input("Ask about a Moroccan meal recipe"):
     st.session_state.messages.append({"role": "user", "content": query})
     with st.chat_message("user"):
         st.markdown(query)
@@ -160,13 +171,12 @@ if query := st.chat_input("Ask about a Moroccan meal or recipe"):
                             metadata = chunk
                         else:
                             streamed_response = chunk 
-                            # response_placeholder.markdown(streamed_response)
+                            response_placeholder.markdown(streamed_response)
+
+                    response_placeholder.markdown('')
 
                     llm_response = streamed_response
                     images = metadata.get("images", [])
-
-                    # st.write(f"""\n\n----
-                    # LLM Name : {selected_model} | Token Count: {metadata.get('token_count', 'N/A')} | Response Time: {metadata.get('response_time', 'N/A')} | n_results of context: {n_results}""")
 
                     response = f"""
                     {remove_tags(streamed_response)}
@@ -189,7 +199,6 @@ if query := st.chat_input("Ask about a Moroccan meal or recipe"):
                             st.image(img_url, use_container_width=True)
 
                     st.write(response)
-
                     st.session_state.messages.append({"role": "assistant", "content": response, "images": images})
 
                 else : 

@@ -34,11 +34,13 @@ try:
 except LookupError:
     download('punkt_tab')
 
+# Load SentenceTransformer model for semantic similarity (Contriever-style)
+embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+
 def get_recipe_images(query, max_results=3):
     with DDGS() as ddgs:
         results = ddgs.images(keywords=query, max_results=max_results)
         return [result['image'] for result in results]
-
 
 def is_connected():
     try:
@@ -48,9 +50,6 @@ def is_connected():
     except OSError:
         pass
     return False
-
-# Load SentenceTransformer model for semantic similarity (Contriever-style)
-embedder = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
 class RAGSystem :
     def __init__(
@@ -73,22 +72,13 @@ class RAGSystem :
 
         self.index_path = os.path.join(db_path, f"{collection_name}.index")
         self.meta_path = os.path.join(db_path, f"{collection_name}.pkl")
-        # os.makedirs(db_path, exist_ok=True)
 
         if os.path.exists(self.index_path):
-            # print("🔄 Loading FAISS index...")
             self.index = faiss.read_index(self.index_path)
-        else:
-            return "⚙️ No FAISS DB Found"
-            # print("⚙️ No FAISS index Found -> Creating new FAISS index...")
-            # self.index = faiss.IndexFlatL2(1024)
 
         if os.path.exists(self.meta_path):
-            # print("📦 Loading metadata...")
             with open(self.meta_path, 'rb') as f:
                 self.collection = pickle.load(f)
-        else:
-            self.collection = []
     
     def _setup_logging(self) -> logging.Logger:
         logger = logging.getLogger(__name__)
@@ -215,7 +205,7 @@ class RAGSystem :
         - Put what you find from the context **without summarizing**.
         - Answer directly and concisely.
         - Recommend 3 Meal(s) depends on User Ingredients or Description.
-        - always provide the recipe name, description, ingredients, and preparation steps (if available) in structured list.
+        - always provide the recipe name, description, ingredients, and preparation steps (if available) in structured unordered list.
 
     ### **Answer:**
 
@@ -295,13 +285,23 @@ class RAGSystem :
 
         images = []
         if is_connected():
-            text = reranked_retrieved_docs[0]
-            match = re.search(r'Recipe Name\s*:\s*(.*)', text)
-            if match:
-                recipe_name = match.group(1)
-                images = get_recipe_images(recipe_name)
-            else:
-                images = get_recipe_images(query)
+            if self.task_code == 1:
+                match = re.search(r'Recipe Name\s*:\s*(.*)', reranked_retrieved_docs[0])
+                if match:
+                    recipe_name = match.group(1)
+                    images = get_recipe_images(recipe_name)
+                else:
+                    images = get_recipe_images(query)
+            
+            else : 
+                for i in range(3) :
+                    match = re.search(r'Recipe Name\s*:\s*(.*)', reranked_retrieved_docs[i])
+                    if match:
+                        recipe_name = match.group(1)
+                        images.append(get_recipe_images(recipe_name, max_results=1))
+                    else:
+                        images.append(get_recipe_images(query, max_results=1))
+
 
         context = "\n\n########\n\n".join(reranked_retrieved_docs)
 
