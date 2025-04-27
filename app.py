@@ -124,8 +124,8 @@ with st.sidebar:
 
     st.info("""#### Chatbot Tasks : 
             
-    - Search for Meal Recipe based on the Meal Name
-    - Recommend a Meal Recipe based on your Ingredients""")
+    - Ask about Meal Recipe based on the Meal Name.
+    - Recommend a Meal Recipe based on your Ingredients or Descroption.""")
 
 if task == 'Ask' :
     task_code = 1

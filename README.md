@@ -92,9 +92,15 @@ streamlit run app.py
 
 ## 📸 Screenshots
 
-![Chat Example](imgs/App.png)
+![App](imgs/App.png)
 
-![Chat Example](imgs/sidebar.png)
+![Side bar](imgs/sidebar.png)
+
+![Task](imgs/task.png)
+
+![Ollama Provider](imgs/provider1.png)
+
+![Openrouter Provider](imgs/provider2.png)
 
 ![Chat Example](imgs/img0.png)
 
