@@ -9,3 +9,4 @@ Moroccan_Recipes_ChromaDB/
 env/
 .env
 .env/
+venv/

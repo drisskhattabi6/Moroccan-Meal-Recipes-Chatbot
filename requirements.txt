@@ -1,0 +1,14 @@
+duckduckgo_search
+faiss-cpu
+langchain_community
+langchain_core
+langchain_ollama
+nltk
+numpy
+python-dotenv
+rank_bm25
+reportlab
+Requests
+scikit_learn
+sentence_transformers
+streamlit
